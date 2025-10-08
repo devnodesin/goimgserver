@@ -21,8 +21,8 @@ profile.cov
 goimgserver
 
 # Runtime directories
-/images/
-/cache/
+images/
+cache/
 settings.conf
 
 # Dependency directories (remove the comment below to include it)
