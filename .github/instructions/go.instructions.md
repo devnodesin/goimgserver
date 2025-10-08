@@ -20,7 +20,9 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 - Document exported types, functions, methods, and packages
 - Use Go modules for dependency management
 - Leverage the Go standard library instead of reinventing the wheel (e.g., use `strings.Builder` for string concatenation, `filepath.Join` for path construction)
+- **Use Gin Web Framework**: Leverage Gin's features (routing, middleware, parameter binding, validation, rendering) instead of implementing custom HTTP handling
 - Prefer standard library solutions over custom implementations when functionality exists
+- **Prefer established frameworks**: Use Gin for HTTP servers, testify for testing assertions, and other well-maintained packages over custom implementations
 - Write comments in English by default; translate only upon user request
 - Avoid using emoji in code and comments
 
@@ -152,7 +154,9 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 ### Dependency Management
 
 - Use Go modules (`go.mod` and `go.sum`)
-- Keep dependencies minimal
+- **Prioritize Gin Web Framework**: Use `github.com/gin-gonic/gin` for HTTP server functionality
+- Keep dependencies minimal and prefer well-established packages
+- **Leverage Gin ecosystem**: Use Gin-compatible middleware and extensions when available
 - Regularly update dependencies for security patches
 - Use `go mod tidy` to clean up unused dependencies
 - Vendor dependencies only when necessary
@@ -238,16 +242,209 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 
 ## API Design
 
-### HTTP Handlers
+### Gin Web Framework - https://gin-gonic.com/
 
-- Use `http.HandlerFunc` for simple handlers
-- Implement `http.Handler` for handlers that need state
-- Use middleware for cross-cutting concerns
-- Set appropriate status codes and headers
-- Handle errors gracefully and return appropriate error responses
-- Router usage by Go version:
-	- If `go >= 1.22`, prefer the enhanced `net/http` `ServeMux` with pattern-based routing and method matching
-	- If `go < 1.22`, use the classic `ServeMux` and handle methods/paths manually (or use a third-party router when justified)
+**MANDATORY**: Use Gin Web Framework for all HTTP server implementations. Leverage Gin's features and best practices instead of reinventing the wheel.
+
+#### Core Gin Principles
+- **Use Gin's router**: `gin.Default()` or `gin.New()` for custom middleware setup
+- **Leverage Gin middleware**: Built-in and custom middleware for cross-cutting concerns
+- **Use Gin's context**: `*gin.Context` for request/response handling
+- **Follow Gin patterns**: Handler functions, middleware chains, route groups
+- **Utilize Gin features**: Parameter binding, validation, rendering, error handling
+
+#### Gin Router Setup
+```go
+// Use gin.Default() for development (includes logging and recovery middleware)
+router := gin.Default()
+
+// Use gin.New() for production with custom middleware
+router := gin.New()
+router.Use(gin.Logger())
+router.Use(gin.Recovery())
+```
+
+#### Gin Handler Functions
+```go
+// Proper Gin handler signature
+func handleImageRequest(c *gin.Context) {
+    // Use Gin's parameter binding
+    filename := c.Param("filename")
+    
+    // Use Gin's query parameter handling
+    quality := c.DefaultQuery("quality", "75")
+    
+    // Use Gin's JSON response
+    c.JSON(http.StatusOK, gin.H{
+        "filename": filename,
+        "quality":  quality,
+    })
+}
+
+// Register routes using Gin's router
+router.GET("/img/:filename", handleImageRequest)
+```
+
+#### Gin Middleware Best Practices
+```go
+// Use built-in middleware when possible
+router.Use(gin.Logger())
+router.Use(gin.Recovery())
+
+// Custom middleware following Gin patterns
+func customMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Pre-processing
+        start := time.Now()
+        
+        // Process request
+        c.Next()
+        
+        // Post-processing
+        latency := time.Since(start)
+        log.Printf("Request processed in %v", latency)
+    }
+}
+```
+
+#### Gin Route Groups
+```go
+// Use route groups for organizing endpoints
+api := router.Group("/api/v1")
+{
+    api.GET("/images/:filename", handleImage)
+    api.POST("/images/clear", clearCache)
+}
+
+// Middleware can be applied to route groups
+auth := router.Group("/admin")
+auth.Use(authMiddleware())
+{
+    auth.POST("/cmd/clear", clearAllCache)
+    auth.POST("/cmd/gitupdate", gitUpdate)
+}
+```
+
+#### Gin Parameter Binding and Validation
+```go
+// Use Gin's ShouldBind for automatic binding
+type ImageRequest struct {
+    Width   int    `form:"width" binding:"min=10,max=4000"`
+    Height  int    `form:"height" binding:"min=10,max=4000"`
+    Quality int    `form:"quality" binding:"min=1,max=100"`
+    Format  string `form:"format" binding:"oneof=webp png jpeg jpg"`
+}
+
+func handleImageProcess(c *gin.Context) {
+    var req ImageRequest
+    if err := c.ShouldBind(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+    
+    // Process with validated parameters
+    // ...
+}
+```
+
+#### Gin Error Handling
+```go
+// Use Gin's error handling mechanisms
+func handleWithError(c *gin.Context) {
+    result, err := processImage()
+    if err != nil {
+        // Use Gin's AbortWithStatusJSON for errors
+        c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+            "error": "Processing failed",
+            "code":  "PROCESSING_ERROR",
+        })
+        return
+    }
+    
+    c.JSON(http.StatusOK, result)
+}
+
+// Global error middleware
+func errorMiddleware() gin.HandlerFunc {
+    return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+        if err, ok := recovered.(string); ok {
+            c.JSON(http.StatusInternalServerError, gin.H{
+                "error": "Internal server error",
+                "code":  "INTERNAL_ERROR",
+            })
+        }
+        c.AbortWithStatus(http.StatusInternalServerError)
+    })
+}
+```
+
+#### Gin Response Rendering
+```go
+// Use Gin's built-in response methods
+c.JSON(http.StatusOK, data)           // JSON response
+c.XML(http.StatusOK, data)            // XML response
+c.String(http.StatusOK, "Hello")      // String response
+c.Data(http.StatusOK, "image/jpeg", imageData) // Binary data
+c.File("/path/to/file")               // File response
+c.Redirect(http.StatusMovedPermanently, "/new-url") // Redirect
+```
+
+#### Gin Testing Patterns
+```go
+// Test Gin handlers using httptest
+func TestImageHandler(t *testing.T) {
+    // Setup Gin in test mode
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    router.GET("/img/:filename", handleImageRequest)
+    
+    // Create test request
+    req := httptest.NewRequest("GET", "/img/test.jpg", nil)
+    w := httptest.NewRecorder()
+    
+    // Execute request
+    router.ServeHTTP(w, req)
+    
+    // Assert response
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+```
+
+#### Gin Configuration Best Practices
+```go
+// Production setup
+if gin.Mode() == gin.ReleaseMode {
+    gin.DisableConsoleColor()
+}
+
+// Custom log format
+gin.DefaultWriter = io.MultiWriter(os.Stdout, logFile)
+router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+    return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+        param.ClientIP,
+        param.TimeStamp.Format(time.RFC1123),
+        param.Method,
+        param.Path,
+        param.Request.Proto,
+        param.StatusCode,
+        param.Latency,
+        param.Request.UserAgent(),
+        param.ErrorMessage,
+    )
+}))
+```
+
+### HTTP Handlers (Legacy - Use Gin Instead)
+
+⚠️ **DEPRECATED**: Use Gin Web Framework instead of standard `http.HandlerFunc`
+
+- ~~Use `http.HandlerFunc` for simple handlers~~
+- ~~Implement `http.Handler` for handlers that need state~~
+- ~~Use middleware for cross-cutting concerns~~
+- ~~Set appropriate status codes and headers~~
+- ~~Handle errors gracefully and return appropriate error responses~~
+
+**Instead**: Use Gin's handler functions, middleware, and context for all HTTP operations.
 
 ### JSON APIs
 
@@ -349,32 +546,90 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 - **Test edge cases and boundary conditions** (empty inputs, nil values, large datasets)
 - **One assertion per test** when possible for clarity
 - **Arrange-Act-Assert structure**: Setup, execute, verify in clear sections
+- **Use testify for assertions**: `github.com/stretchr/testify/assert` for cleaner test code
+- **Test Gin handlers**: Use `gin.SetMode(gin.TestMode)` and `httptest` for HTTP handler testing
 - Consider using `testify` or similar libraries when they add value, but don't over-complicate simple tests
 
 ### Test-First Examples
 
 ```go
-// Step 1: Write failing test first
-func TestImageProcessor_Resize_ValidDimensions(t *testing.T) {
-    processor := NewImageProcessor()
-    input := []byte("mock image data")
+// Step 1: Write failing test first for Gin handler
+func TestImageHandler_GET_ValidRequest(t *testing.T) {
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
     
-    result, err := processor.Resize(input, 100, 200)
+    // This will fail because handleImageRequest doesn't exist yet
+    router.GET("/img/:filename", handleImageRequest)
     
-    assert.NoError(t, err)
-    assert.NotNil(t, result)
-    // Test will fail because Resize method doesn't exist yet
+    req := httptest.NewRequest("GET", "/img/test.jpg", nil)
+    w := httptest.NewRecorder()
+    
+    router.ServeHTTP(w, req)
+    
+    assert.Equal(t, http.StatusOK, w.Code)
+    // Test will fail because handler doesn't exist yet
 }
 
-// Step 2: Write minimal implementation to make test pass
-func (p *ImageProcessor) Resize(data []byte, width, height int) ([]byte, error) {
-    // Minimal implementation - just return something to make test pass
-    return data, nil
+// Step 2: Write minimal Gin handler implementation to make test pass
+func handleImageRequest(c *gin.Context) {
+    // Minimal implementation - just return OK to make test pass
+    c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // Step 3: Add more specific tests and refactor implementation
-func TestImageProcessor_Resize_ReturnsCorrectDimensions(t *testing.T) {
+func TestImageHandler_GET_ReturnsImageData(t *testing.T) {
     // More specific test that will drive better implementation
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    router.GET("/img/:filename", handleImageRequest)
+    
+    req := httptest.NewRequest("GET", "/img/test.jpg", nil)
+    w := httptest.NewRecorder()
+    
+    router.ServeHTTP(w, req)
+    
+    assert.Equal(t, http.StatusOK, w.Code)
+    assert.Contains(t, w.Header().Get("Content-Type"), "image/")
+}
+```
+
+#### Gin-Specific TDD Patterns
+```go
+// Test Gin parameter binding
+func TestImageHandler_ParameterBinding(t *testing.T) {
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    router.GET("/img/:filename/:width/:height", handleImageResize)
+    
+    req := httptest.NewRequest("GET", "/img/test.jpg/800/600", nil)
+    w := httptest.NewRecorder()
+    
+    router.ServeHTTP(w, req)
+    
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// Test Gin middleware
+func TestRateLimitMiddleware(t *testing.T) {
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    router.Use(rateLimitMiddleware())
+    router.GET("/test", func(c *gin.Context) {
+        c.JSON(http.StatusOK, gin.H{"status": "ok"})
+    })
+    
+    // Test multiple requests to trigger rate limit
+    for i := 0; i < 10; i++ {
+        req := httptest.NewRequest("GET", "/test", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        
+        if i < 5 {
+            assert.Equal(t, http.StatusOK, w.Code)
+        } else {
+            assert.Equal(t, http.StatusTooManyRequests, w.Code)
+        }
+    }
 }
 ```
 
@@ -434,6 +689,7 @@ func TestImageProcessor_Resize_ReturnsCorrectDimensions(t *testing.T) {
 - `go test`: Run tests
 - `go mod`: Manage dependencies
 - `go generate`: Code generation
+- **Gin Web Framework**: `github.com/gin-gonic/gin` for HTTP server development
 
 ### Development Practices
 
@@ -456,3 +712,5 @@ func TestImageProcessor_Resize_ReturnsCorrectDimensions(t *testing.T) {
 - Over-using unconstrained types (e.g., `any`); prefer specific types or generic type parameters with constraints. If an unconstrained type is required, use `any` rather than `interface{}`
 - Not considering the zero value of types
 - **Creating duplicate `package` declarations** - this is a compile error; always check existing files before adding package declarations
+- **Reinventing HTTP handling** - use Gin Web Framework instead of custom HTTP routers, middleware, or parameter parsing
+- **Not leveraging Gin features** - use Gin's built-in parameter binding, validation, middleware, and rendering instead of custom implementations
