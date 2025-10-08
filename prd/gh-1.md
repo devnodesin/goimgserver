@@ -1,5 +1,8 @@
-I ant to create best desing document for complete implmentation 
+# Go Project Quick Setup
 
-
-
-IMPORTAN only write the desing no coding. 
+```bash
+cd src
+go mod init goimgserver
+go get github.com/gin-gonic/gin
+go run main.go
+```
