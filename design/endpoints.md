@@ -4,6 +4,7 @@
 
 - `POST /cmd/{name}`: Executes a specific command based on the provided name.
 - `POST /cmd/clear`: Clears the entire cache directory.
+- `POST /cmd/gitupdate`: run `git update` inside image_dir, (only image_dir is a git dir)
 
 ## Image Endpoints
 

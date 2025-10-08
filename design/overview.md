@@ -1,6 +1,6 @@
 ## goimgserver
 
-goimgserver is a backend service that stores images and serves optimized, resized, and converted images on the fly based on URL parameters.
+**_goimgserver_** is a backend service designed to store images and serve optimized, resized, and converted images dynamically based on URL parameters. It is built for high performance, scalability, and ease of use, with a focus on caching and efficient image processing.
 
 ## Features
 
