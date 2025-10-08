@@ -24,6 +24,41 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 - Write comments in English by default; translate only upon user request
 - Avoid using emoji in code and comments
 
+## Test-Driven Development (TDD) Principles
+
+**MANDATORY**: Follow Test-Driven Development (TDD) methodology for all code implementation:
+
+### TDD Cycle (Red-Green-Refactor)
+1. **Red**: Write a failing test first
+   - Write the minimal test that defines the desired behavior
+   - Ensure the test fails for the right reason
+   - Tests must be specific and focused on one behavior
+2. **Green**: Write the minimal code to make the test pass
+   - Implement only what's needed to make the test pass
+   - Don't over-engineer or add unnecessary features
+   - Focus on making tests pass quickly
+3. **Refactor**: Improve the code while keeping tests green
+   - Clean up code structure and design
+   - Extract common functionality
+   - Ensure all tests continue to pass
+
+### TDD Implementation Rules
+- **Always write tests before implementation code**
+- **Never write production code without a failing test**
+- **Write the smallest possible test that fails**
+- **Write the smallest amount of production code to make the test pass**
+- **Run tests frequently** (after every small change)
+- **Keep test cycles short** (minutes, not hours)
+- **One failing test at a time** - fix before moving to the next
+
+### Test Structure and Organization
+- **Test file naming**: Use `*_test.go` suffix
+- **Test function naming**: `Test_<FunctionName>_<Scenario>` format
+- **Table-driven tests**: Use for multiple test cases with same logic
+- **Test helpers**: Mark with `t.Helper()` and keep them focused
+- **Test fixtures**: Create reusable test data and setup functions
+- **Arrange-Act-Assert (AAA)**: Structure tests clearly with setup, execution, and verification phases
+
 ## Naming Conventions
 
 ### Packages
@@ -278,20 +313,70 @@ Follow idiomatic Go practices and community standards when writing Go code. Thes
 
 ## Testing
 
+**CRITICAL**: All code must be developed using Test-Driven Development (TDD). Tests are not optional - they drive the design and implementation.
+
 ### Test Organization
 
 - Keep tests in the same package (white-box testing)
 - Use `_test` package suffix for black-box testing
 - Name test files with `_test.go` suffix
 - Place test files next to the code they test
+- **Write tests BEFORE writing implementation code**
 
-### Writing Tests
+### TDD Test Writing Process
 
-- Use table-driven tests for multiple test cases
-- Name tests descriptively using `Test_functionName_scenario`
-- Use subtests with `t.Run` for better organization
-- Test both success and error cases
+1. **Start with a failing test**:
+   - Write the test that describes the behavior you want
+   - Run the test to confirm it fails for the right reason
+   - The test should fail because the functionality doesn't exist yet
+
+2. **Write minimal implementation**:
+   - Write only enough code to make the test pass
+   - Don't write extra functionality that isn't tested
+   - Keep the implementation simple and focused
+
+3. **Refactor with confidence**:
+   - Improve the code structure while keeping tests green
+   - Tests provide safety net for refactoring
+   - Clean up both test and production code
+
+### Test Writing Guidelines
+
+- **Use table-driven tests** for multiple test cases with similar logic
+- **Name tests descriptively** using `Test_functionName_scenario` format
+- **Use subtests** with `t.Run` for better organization and parallel execution
+- **Test both success and error cases** - error cases are especially important
+- **Test edge cases and boundary conditions** (empty inputs, nil values, large datasets)
+- **One assertion per test** when possible for clarity
+- **Arrange-Act-Assert structure**: Setup, execute, verify in clear sections
 - Consider using `testify` or similar libraries when they add value, but don't over-complicate simple tests
+
+### Test-First Examples
+
+```go
+// Step 1: Write failing test first
+func TestImageProcessor_Resize_ValidDimensions(t *testing.T) {
+    processor := NewImageProcessor()
+    input := []byte("mock image data")
+    
+    result, err := processor.Resize(input, 100, 200)
+    
+    assert.NoError(t, err)
+    assert.NotNil(t, result)
+    // Test will fail because Resize method doesn't exist yet
+}
+
+// Step 2: Write minimal implementation to make test pass
+func (p *ImageProcessor) Resize(data []byte, width, height int) ([]byte, error) {
+    // Minimal implementation - just return something to make test pass
+    return data, nil
+}
+
+// Step 3: Add more specific tests and refactor implementation
+func TestImageProcessor_Resize_ReturnsCorrectDimensions(t *testing.T) {
+    // More specific test that will drive better implementation
+}
+```
 
 ### Test Helpers
 
