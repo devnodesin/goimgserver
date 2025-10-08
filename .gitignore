@@ -17,6 +17,14 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Build output
+goimgserver
+
+# Runtime directories
+/images/
+/cache/
+settings.conf
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
