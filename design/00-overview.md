@@ -1,4 +1,4 @@
-## goimgserver
+# goimgserver
 
 **_goimgserver_** is a backend service designed to store images and serve optimized, resized, and converted images dynamically based on URL parameters. It is built for high performance, scalability, and ease of use, with a focus on caching and efficient image processing.
 
@@ -9,7 +9,8 @@ For consistency across all documentation, the following placeholders are used:
 - **{image_dir}** - Image directory path (default: `./images`)
 - **{cache_dir}** - Cache directory path (default: `./cache`)
 - **{default_image}** - Default placeholder image file
-- **{filename}** - Requested image filename
+- **{filename}** - Requested image filename (with or without extension)
+- **{foldername}** - Grouped image folder name
 - **{width}** - Image width in pixels
 - **{height}** - Image height in pixels
 - **{format}** - Image format (webp, png, jpeg, jpg)
@@ -24,27 +25,76 @@ For consistency across all documentation, the following placeholders are used:
 - **Format**: Supports WebP (default), PNG, JPEG.
 - **Quality**: Adjustable quality via `q{quality}` (e.g., `q95`). Default: `q75`.
 - **Caching**: Resized images are cached to accelerate delivery and improve performance. Cached files are served directly when available.
+- **Flexible File Extensions**: Supports requests with or without file extensions (e.g., `/img/cat` automatically matches `cat.jpg`)
+- **Grouped Images**: Supports organizing images in folders with default image fallback
+- **Extension Match Order**: When multiple file extensions exist, prioritizes: jpg/jpeg, png, webp
 - **Default Image Fallback**: When requested image is not found, serves {default_image} with same processing parameters.
 - **Automatic Placeholder Generation**: If {default_image} is missing, generates a programmatic placeholder (1000x1000px, white background, "goimgserver" text).
 - **Performance**: Fast and secure for dynamic URL-based image processing.
 - **CORS-based access**: Enables cross-origin resource sharing.
 - **No UI**: Only returns the image when the URL is accessed.
 
+## Image Organization Patterns
+
+### Single Images
+Traditional single image storage:
+```
+{image_dir}/
+├── cat.jpg
+├── dog.png
+├── logo.webp
+└── default.jpg
+```
+
+### Grouped Images
+Organized images in folders with default fallback:
+```
+{image_dir}/
+├── cats/
+│   ├── default.jpg        # Default image for /img/cats
+│   ├── cat_white.jpg      # Accessible as /img/cats/cat_white
+│   ├── funny_white.png    # Accessible as /img/cats/funny_white.png
+│   └── cute_cat.webp      # Accessible as /img/cats/cute_cat
+└── dogs/
+    ├── default.png
+    └── puppy.jpg
+```
+
+### File Extension Handling
+
+#### With Extension
+- `GET /img/cat.jpg` → matches `{image_dir}/cat.jpg`
+- `GET /img/cats/funny_white.png` → matches `{image_dir}/cats/funny_white.png`
+
+#### Without Extension (Auto-detection)
+When no extension provided, searches in order: jpg/jpeg, png, webp
+- `GET /img/cat` → searches for `cat.jpg`, then `cat.png`, then `cat.webp`
+- `GET /img/cats/cute_cat` → searches for `cute_cat.jpg`, then `cute_cat.png`, then `cute_cat.webp`
+
+#### Grouped Image Access
+- `GET /img/cats` → serves `{image_dir}/cats/default.{ext}` (following extension order)
+- `GET /img/cats/cat_white` → serves `{image_dir}/cats/cat_white.{ext}` (following extension order)
+- `GET /img/cats/funny_white.png/300x300/webp` → serves `{image_dir}/cats/funny_white.png` resized and converted
+
 ## Request Flow
 
 The following steps outline the process from receiving a request to serving the image:
 
 - **Request Received**: The server receives an HTTP request with parameters specifying the image filename, dimensions, format, and quality.
-- **Cache Lookup**: The server checks {cache_dir}/{filename}/{hash} for a pre-processed image matching the request parameters.
+- **File Resolution**: 
+  - Parse URL to extract {filename} or {foldername}/{filename}
+  - If no extension provided, search for file following extension match order (jpg/jpeg, png, webp)
+  - For grouped images (`/img/{foldername}`), look for `{foldername}/default.{ext}`
+- **Cache Lookup**: The server checks {cache_dir}/{resolved_path}/{hash} for a pre-processed image matching the request parameters.
   - If a cached image is found, it is served immediately.
   - If no cached image is found, the request proceeds to the processing stage.
 - **Image Processing**:
-  - The original image is retrieved from {image_dir}.
-  - **If image not found**: Falls back to {default_image} from {image_dir}/default.{jpg/jpeg/png/webp}
+  - The original image is retrieved from resolved path in {image_dir}.
+  - **If image not found**: Falls back to {default_image} from {image_dir}/default.{ext}
   - **If {default_image} not found**: Uses programmatically generated placeholder
   - The image (original, default, or generated) is resized, converted, and optimized based on the request parameters using libvips via bimg.
 - **Cache Storage**:
-  - The processed image is stored in {cache_dir}/{filename}/{hash} for future requests.
+  - The processed image is stored in {cache_dir}/{resolved_path}/{hash} for future requests.
 - **Response**:
   - The processed image is returned to the client with appropriate HTTP headers for caching and content type.
 
@@ -63,12 +113,12 @@ This flow ensures high performance by prioritizing cache hits and providing grac
     - Format: JPEG
     - Save as {image_dir}/default.jpg
 - **Pre-cache Initialization**:
-  - The application scans {image_dir} for original images.
+  - The application scans {image_dir} for original images (including grouped images).
   - For each image, a cached version is created using the default settings:
     - Dimensions: `1000x1000`
     - Format: `webp`
     - Quality: `95`
-  - Cached images are stored in {cache_dir}/{filename}/{hash} directory structure.
+  - Cached images are stored in {cache_dir}/{resolved_path}/{hash} directory structure.
 - **Server Initialization**:
   - The HTTP server is started and begins listening for incoming requests.
 - **Error Handling**:
@@ -76,7 +126,7 @@ This flow ensures high performance by prioritizing cache hits and providing grac
 
 This startup process ensures that the application is fully prepared to handle requests efficiently and always has a {default_image} available for fallback scenarios.
 
-### Future Enhancements
+## Future Enhancements
 
 - Add support for additional image formats (e.g., AVIF, TIFF).
 - Implement authentication for secure access.
@@ -104,24 +154,22 @@ This startup process ensures that the application is fully prepared to handle re
 - **Test Coverage**: Maintain >90% test coverage across all components
 - **Continuous Testing**: Tests run on every change and before every commit
 
-See [`design/tdd-methodology.md`](tdd-methodology.md) for detailed TDD implementation guidelines.
+See [`01-tdd-methodology.md`](01-tdd-methodology.md) for detailed TDD implementation guidelines.
 
 ## Folder Structure
 
 ```plaintext
-/design          ← Software design documents and specifications
-/src
+./design          ← Software design documents and specifications
+./src
   main.go        ← Entry point for the application
 ```
 
 ## Endpoints
 
-See [`design/endpoints.md`](design/endpoints.md) for full details.
+See [`02-endpoints.md`](02-endpoints.md) for full details.
 
 - **Image endpoints**: Resize, convert, and serve images via URL parameters.
 - **Command endpoints**: Perform cache management and other administrative actions.
-
-pwd = current working directory
 
 ## Command-Line Arguments
 
@@ -139,10 +187,11 @@ The application uses command-line arguments for configuration:
 ## References
 
 - Usage: See [`README.md`](../README.md)
-- Endpoints: See [`design/endpoints.md`](endpoints.md)
-- URL Parsing: See [`design/url-parsing.md`](url-parsing.md)
-- Default Image System: See [`design/default-image.md`](default-image.md)
-- API Specification: See [`design/api-specification.md`](api-specification.md)
-- Security: See [`design/security.md`](security.md)
-- TDD Methodology: See [`design/tdd-methodology.md`](tdd-methodology.md)
-- Deployment: See [`design/deployment.md`](deployment.md)
+- Endpoints: See [`02-endpoints.md`](02-endpoints.md)
+- URL Parsing: See [`03-url-parsing.md`](03-url-parsing.md)
+- File Resolution: See [`04-file-resolution.md`](04-file-resolution.md)
+- Default Image System: See [`05-default-image.md`](05-default-image.md)
+- API Specification: See [`06-api-specification.md`](06-api-specification.md)
+- Security: See [`07-security.md`](07-security.md)
+- TDD Methodology: See [`01-tdd-methodology.md`](01-tdd-methodology.md)
+- Deployment: See [`08-deployment.md`](08-deployment.md)
