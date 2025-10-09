@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"goimgserver/cache"
 	"goimgserver/config"
+	"goimgserver/handlers"
+	"goimgserver/processor"
+	"goimgserver/resolver"
 	"log"
 	"net/http"
 	"os"
@@ -42,6 +46,28 @@ func main() {
 	log.Println("Starting goimgserver with configuration:")
 	log.Print(cfg.String())
 
+	// Initialize components
+	log.Println("Initializing components...")
+	
+	// Create resolver
+	fileResolver := resolver.NewResolverWithCache(cfg.ImagesDir)
+	log.Println("File resolver initialized")
+	
+	// Create cache manager
+	cacheManager, err := cache.NewManager(cfg.CacheDir)
+	if err != nil {
+		log.Fatalf("Failed to create cache manager: %v", err)
+	}
+	log.Println("Cache manager initialized")
+	
+	// Create image processor
+	imageProcessor := processor.New()
+	log.Println("Image processor initialized")
+	
+	// Create image handler
+	imageHandler := handlers.NewImageHandler(cfg, fileResolver, cacheManager, imageProcessor)
+	log.Println("Image handler initialized")
+
 	// Create a Gin router with default middleware (logger and recovery)
 	r := gin.Default()
 
@@ -58,6 +84,10 @@ func main() {
 			"message": "pong",
 		})
 	})
+	
+	// Image endpoints
+	r.GET("/img/*path", imageHandler.ServeImage)
+	log.Println("Image endpoints registered")
 
 	// Print server startup message
 	fmt.Println("Server started and running.")
