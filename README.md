@@ -7,6 +7,7 @@ goimgserver - These services allow you to store images, then serve optimized, re
 - **Dynamic Image Resizing**: Resize images on-the-fly with URL parameters
 - **Format Conversion**: Convert images to WebP, PNG, or JPEG
 - **Caching**: Automatic caching of processed images for performance
+- **Pre-cache System**: Startup pre-caching of images for improved initial response times
 - **Command Endpoints**: Administrative commands for cache management and Git operations
 
 ## Usage
@@ -29,6 +30,8 @@ All parameters are optional: if not specified, they will start with default valu
 - `--port XXXX` defaults to `9000`
 - `--imagesdir /path/to/images` defaults to `{pwd}/images`
 - `--cachedir /path/to/cache` defaults to `{pwd}/cache`
+- `--precache` defaults to `true` (enables pre-caching on startup)
+- `--precache-workers N` defaults to `0` (auto, uses CPU count)
 
 2. **Access the endpoints**:
 
@@ -101,6 +104,44 @@ Updates the images directory via `git pull` if it's a git repository.
 Generic command router that dispatches to specific command handlers.
 
 **Valid Commands:** `clear`, `gitupdate`
+
+## Pre-cache System
+
+The server includes an automatic pre-caching system that runs during startup to improve initial response times.
+
+### How It Works
+
+When the server starts, it:
+1. Scans the images directory for all supported image files (JPEG, PNG, WebP)
+2. Creates default cached versions of each image:
+   - **Dimensions**: 1000x1000 pixels
+   - **Format**: WebP
+   - **Quality**: 95
+3. Stores pre-cached images in the cache directory
+4. Skips already cached images to avoid redundant work
+
+### Configuration
+
+```bash
+# Enable pre-cache (default)
+go run main.go --precache=true
+
+# Disable pre-cache
+go run main.go --precache=false
+
+# Set number of workers (0 = auto, uses CPU count)
+go run main.go --precache-workers=8
+```
+
+### Features
+
+- **Async Execution**: Runs asynchronously to not block server startup
+- **Concurrent Processing**: Uses worker pools for fast processing
+- **Progress Logging**: Real-time progress updates in logs
+- **Error Handling**: Gracefully handles corrupted or missing images
+- **Smart Exclusion**: Skips system default images and already cached files
+
+For more details, see [Pre-cache Package Documentation](src/precache/README.md).
 
 ## Testing
 

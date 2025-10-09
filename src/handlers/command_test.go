@@ -6,6 +6,7 @@ import (
 	"errors"
 	"goimgserver/cache"
 	"goimgserver/config"
+	"goimgserver/git"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,14 +23,14 @@ import (
 type mockGitOperations struct {
 	isGitRepoResult  bool
 	execGitPullError error
-	execGitPullResult *GitPullResult
+	execGitPullResult *git.GitPullResult
 }
 
 func (m *mockGitOperations) IsGitRepo(dir string) bool {
 	return m.isGitRepoResult
 }
 
-func (m *mockGitOperations) ExecuteGitPull(ctx context.Context, dir string) (*GitPullResult, error) {
+func (m *mockGitOperations) ExecuteGitPull(ctx context.Context, dir string) (*git.GitPullResult, error) {
 	if m.execGitPullError != nil {
 		return nil, m.execGitPullError
 	}
@@ -136,7 +137,7 @@ func TestCommandHandler_POST_GitUpdate_ValidRepo(t *testing.T) {
 	
 	mockGit := &mockGitOperations{
 		isGitRepoResult: true,
-		execGitPullResult: &GitPullResult{
+		execGitPullResult: &git.GitPullResult{
 			Success:    true,
 			Branch:     "main",
 			Changes:    5,

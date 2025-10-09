@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goimgserver/cache"
 	"goimgserver/config"
+	"goimgserver/git"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,17 +18,8 @@ import (
 // GitOperations defines the interface for git operations
 type GitOperations interface {
 	IsGitRepo(dir string) bool
-	ExecuteGitPull(ctx context.Context, dir string) (*GitPullResult, error)
+	ExecuteGitPull(ctx context.Context, dir string) (*git.GitPullResult, error)
 	ValidatePath(path, allowedBase string) bool
-}
-
-// GitPullResult represents the result of a git pull operation
-type GitPullResult struct {
-	Success    bool
-	Branch     string
-	Changes    int
-	LastCommit string
-	Output     string
 }
 
 // CommandHandler handles administrative command endpoints
