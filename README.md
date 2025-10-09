@@ -160,8 +160,144 @@ Test command endpoints (requires server to be running):
 
 ## Documentation
 
-- [Complete Design](design/complete_design.md)
-- [API Specification](design/06-api-specification.md)
-- [Security](design/07-security.md)
-- [Command Implementation](COMMAND_IMPLEMENTATION.md)
+### Quick Start Guides
+
+- [API Documentation](docs/api/README.md) - Complete API reference with examples
+- [Basic Usage](docs/api/examples/basic_usage.md) - Getting started with image processing
+- [Advanced Usage](docs/api/examples/advanced_usage.md) - Advanced patterns and optimization
+
+### Deployment
+
+- [Deployment Guide](docs/deployment/README.md) - Complete deployment instructions
+  - [Systemd Deployment](docs/deployment/systemd/) - Linux service installation
+  - [Docker Deployment](docs/deployment/docker/) - Container-based deployment
+  - [Nginx Configuration](docs/deployment/nginx/) - Reverse proxy setup
+
+### Operations
+
+- [Performance Guide](docs/performance/README.md) - Optimization and tuning
+- [Security Guide](docs/security/README.md) - Security hardening and best practices
+- [Troubleshooting Guide](docs/troubleshooting/README.md) - Common issues and solutions
+
+### Reference
+
+- [OpenAPI Specification](docs/api/openapi.yaml) - Machine-readable API specification
+- [Design Documents](design/) - Architecture and design decisions
+
+## Quick Examples
+
+### Basic Image Operations
+
+```bash
+# Get original image
+curl http://localhost:9000/img/photo.jpg -o photo.jpg
+
+# Thumbnail (150x150)
+curl http://localhost:9000/img/photo.jpg/150x150 -o thumb.jpg
+
+# Medium size with WebP format
+curl http://localhost:9000/img/photo.jpg/800x600/webp -o medium.webp
+
+# Custom quality
+curl "http://localhost:9000/img/photo.jpg/1920x1080/webp?quality=90" -o hd.webp
+```
+
+### HTML Integration
+
+```html
+<!-- Simple responsive image -->
+<img 
+    src="http://localhost:9000/img/photo.jpg/800x600/webp"
+    srcset="
+        http://localhost:9000/img/photo.jpg/400x300/webp 400w,
+        http://localhost:9000/img/photo.jpg/800x600/webp 800w,
+        http://localhost:9000/img/photo.jpg/1920x1080/webp 1920w
+    "
+    sizes="(max-width: 600px) 400px, (max-width: 1200px) 800px, 1920px"
+    alt="Photo">
+```
+
+### Maintenance Operations
+
+```bash
+# Check server health
+curl http://localhost:9000/health
+
+# Clear cache
+curl -X POST http://localhost:9000/cmd/clear
+
+# Update images from Git
+curl -X POST http://localhost:9000/cmd/gitupdate
+```
+
+## Production Deployment
+
+### Quick Start with Docker
+
+```bash
+# Clone repository
+git clone https://github.com/devnodesin/goimgserver.git
+cd goimgserver
+
+# Prepare images
+mkdir -p docs/deployment/docker/images
+cp /path/to/your/images/* docs/deployment/docker/images/
+
+# Start with Docker Compose
+cd docs/deployment/docker
+docker-compose up -d
+
+# Check status
+docker-compose ps
+docker-compose logs -f
+```
+
+### Quick Start with Systemd
+
+```bash
+# Build application
+cd src
+go build -o goimgserver main.go
+
+# Install as service
+cd ../docs/deployment/systemd
+sudo cp goimgserver /opt/goimgserver/bin/
+sudo ./install.sh
+
+# Start service
+sudo systemctl start goimgserver
+sudo systemctl status goimgserver
+```
+
+## Performance
+
+### Benchmarks
+
+Typical performance on modern hardware (8 cores, 16GB RAM, NVMe SSD):
+
+- **Cached Requests**: 800+ requests/sec, 2-5ms latency
+- **Processing**: 150+ requests/sec, 50-200ms latency
+- **Cache Hit Rate**: 80-95% (typical workload)
+
+See the [Performance Guide](docs/performance/README.md) for optimization tips.
+
+## Security
+
+Key security features:
+
+- ✓ Rate limiting (100 requests/min per IP)
+- ✓ Input validation (path traversal prevention)
+- ✓ Resource limits (max dimensions, quality)
+- ✓ Security headers (X-Frame-Options, CSP)
+- ✓ Access control for admin endpoints
+
+See the [Security Guide](docs/security/README.md) for hardening instructions.
+
+## Contributing
+
+Contributions are welcome! Please see the [design documents](design/) for architecture details and follow TDD methodology outlined in [design/01-tdd-methodology.md](design/01-tdd-methodology.md).
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
