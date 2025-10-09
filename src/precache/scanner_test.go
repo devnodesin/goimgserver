@@ -2,6 +2,7 @@ package precache
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -187,4 +188,34 @@ func Test_ScanDirectory_ExcludeSystemDefaultOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, images, 1, "Should exclude system default but include group default")
 	assert.Contains(t, images[0], filepath.Join("cats", "default.jpg"))
+}
+
+func Test_ScanDirectory_WithContext(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	// Create test images
+	for i := 0; i < 5; i++ {
+		imagePath := filepath.Join(tmpDir, fmt.Sprintf("image%d.jpg", i))
+		err := os.WriteFile(imagePath, []byte("fake image"), 0644)
+		require.NoError(t, err)
+	}
+	
+	scanner := &directoryScanner{}
+	
+	// Test with context
+	ctx := context.Background()
+	images, err := scanner.Scan(ctx, tmpDir, "")
+	
+	require.NoError(t, err)
+	assert.Len(t, images, 5)
+}
+
+func Test_ScanDirectory_NonExistentDirectory(t *testing.T) {
+	scanner := &directoryScanner{}
+	
+	// Test with non-existent directory
+	images, err := scanner.Scan(context.Background(), "/nonexistent/path", "")
+	
+	assert.Error(t, err)
+	assert.Nil(t, images)
 }
