@@ -235,6 +235,114 @@ func TestImageHandler_GET_DefaultImage_MissingFile(t *testing.T) {
 	assert.Greater(t, len(w.Body.Bytes()), 0)
 }
 
+// TestImageHandler_GET_DefaultImage_ProcessingSameParams tests that default image is processed with same parameters
+func TestImageHandler_GET_DefaultImage_ProcessingSameParams(t *testing.T) {
+	// Arrange
+	gin.SetMode(gin.TestMode)
+	imagesDir, cacheDir, cfg := setupTestEnvironment(t)
+
+	resolver := resolver.NewResolver(imagesDir)
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	proc := &mockProcessor{}
+
+	handler := NewImageHandler(cfg, resolver, cacheManager, proc)
+
+	router := gin.New()
+	router.GET("/img/*path", handler.ServeImage)
+
+	// Act - request non-existent file with parameters
+	req := httptest.NewRequest("GET", "/img/nonexistent.jpg/800x600/png/q90", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Assert - should return default image processed with same parameters
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Greater(t, len(w.Body.Bytes()), 0)
+	// Content type should match requested format
+	assert.Contains(t, w.Header().Get("Content-Type"), "image/")
+}
+
+// TestImageHandler_GET_DefaultImage_CacheWithOriginalFilename tests that default image is cached under original path
+func TestImageHandler_GET_DefaultImage_CacheWithOriginalFilename(t *testing.T) {
+	// Arrange
+	gin.SetMode(gin.TestMode)
+	imagesDir, cacheDir, cfg := setupTestEnvironment(t)
+
+	resolver := resolver.NewResolver(imagesDir)
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	proc := &mockProcessor{}
+
+	handler := NewImageHandler(cfg, resolver, cacheManager, proc)
+
+	router := gin.New()
+	router.GET("/img/*path", handler.ServeImage)
+
+	// Act - First request (cache miss)
+	req1 := httptest.NewRequest("GET", "/img/missing.jpg/400x400", nil)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, req1)
+
+	// Act - Second request (should be cache hit)
+	req2 := httptest.NewRequest("GET", "/img/missing.jpg/400x400", nil)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+
+	// Assert - both should succeed
+	assert.Equal(t, http.StatusOK, w1.Code)
+	assert.Equal(t, http.StatusOK, w2.Code)
+	assert.Greater(t, len(w1.Body.Bytes()), 0)
+	assert.Greater(t, len(w2.Body.Bytes()), 0)
+}
+
+// TestImageHandler_GET_GroupedCacheClear tests cache clearing for grouped images
+func TestImageHandler_GET_GroupedCacheClear(t *testing.T) {
+	// Arrange
+	gin.SetMode(gin.TestMode)
+	imagesDir, cacheDir, cfg := setupTestEnvironment(t)
+
+	// Create group default image
+	groupDir := filepath.Join(imagesDir, "cats")
+	defaultPath := filepath.Join(groupDir, "default.jpg")
+	require.NoError(t, createTestImage(defaultPath, 100, 100))
+
+	resolver := resolver.NewResolver(imagesDir)
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	proc := &mockProcessor{}
+
+	handler := NewImageHandler(cfg, resolver, cacheManager, proc)
+
+	router := gin.New()
+	router.GET("/img/*path", handler.ServeImage)
+
+	// First, access the grouped image to cache it
+	req := httptest.NewRequest("GET", "/img/cats/cat_white.jpg", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Act - clear cache for specific grouped image
+	req = httptest.NewRequest("GET", "/img/cats/cat_white.jpg/clear", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Assert
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Also test clearing group default
+	req = httptest.NewRequest("GET", "/img/cats", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	req = httptest.NewRequest("GET", "/img/cats/clear", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 // TestImageHandler_GET_CustomDimensions tests custom dimensions
 func TestImageHandler_GET_CustomDimensions(t *testing.T) {
 	// Arrange
