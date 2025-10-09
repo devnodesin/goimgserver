@@ -14,6 +14,12 @@ goimgserver - These services allow you to store images, then serve optimized, re
 1. **Setup**:
 
 ```bash
+sudo apt-get update && sudo apt-get install -y libvips-dev
+cd src
+go build
+```
+
+```bash
 cd src
 go run main.go
 ```
