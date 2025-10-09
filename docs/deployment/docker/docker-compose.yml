@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  goimgserver:
+    build:
+      context: ../../../
+      dockerfile: docs/deployment/docker/Dockerfile
+    container_name: goimgserver
+    restart: unless-stopped
+    
+    ports:
+      - "9000:9000"
+    
+    volumes:
+      # Mount your images directory
+      - ./images:/app/images:ro
+      # Cache directory for processed images
+      - goimgserver-cache:/app/cache
+    
+    environment:
+      - PORT=9000
+      - GOMAXPROCS=4
+      - GOGC=100
+      - GOMEMLIMIT=6GiB
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+volumes:
+  goimgserver-cache:
+    driver: local
+
+# Optional: nginx reverse proxy
+# Uncomment to use nginx as reverse proxy
+#  nginx:
+#    image: nginx:alpine
+#    container_name: goimgserver-nginx
+#    restart: unless-stopped
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ../nginx/goimgserver.conf:/etc/nginx/conf.d/default.conf:ro
+#      - ./ssl:/etc/nginx/ssl:ro
+#    depends_on:
+#      - goimgserver
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
