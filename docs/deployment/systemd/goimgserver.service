@@ -1,0 +1,47 @@
+[Unit]
+Description=goimgserver - Dynamic Image Resizing Service
+Documentation=https://github.com/devnodesin/goimgserver
+After=network.target
+
+[Service]
+Type=simple
+User=goimgserver
+Group=goimgserver
+WorkingDirectory=/opt/goimgserver
+
+# Service executable
+ExecStart=/opt/goimgserver/bin/goimgserver \
+    --port=9000 \
+    --imagesdir=/opt/goimgserver/images \
+    --cachedir=/opt/goimgserver/cache \
+    --precache=true \
+    --precache-workers=0
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/goimgserver/cache
+ReadOnlyPaths=/opt/goimgserver/images
+
+# Environment variables
+Environment="GOMAXPROCS=4"
+Environment="GOGC=100"
+Environment="GOMEMLIMIT=6GiB"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=goimgserver
+
+[Install]
+WantedBy=multi-user.target

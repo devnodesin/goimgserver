@@ -1,0 +1,560 @@
+openapi: 3.0.3
+info:
+  title: goimgserver API
+  description: |
+    Dynamic image processing and transformation service.
+    
+    goimgserver provides on-the-fly image resizing, format conversion, and caching
+    for optimized web delivery.
+  version: 1.0.0
+  contact:
+    name: goimgserver
+    url: https://github.com/devnodesin/goimgserver
+  license:
+    name: MIT
+    url: https://github.com/devnodesin/goimgserver/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:9000
+    description: Development server
+  - url: https://img.example.com
+    description: Production server
+
+tags:
+  - name: images
+    description: Image processing endpoints
+  - name: commands
+    description: Administrative command endpoints
+  - name: health
+    description: Health check endpoints
+
+paths:
+  /img/{filename}:
+    get:
+      tags:
+        - images
+      summary: Get image with default settings
+      description: Returns the original image or default cached version
+      operationId: getImage
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Name of the image file
+          schema:
+            type: string
+            example: sample.jpg
+      responses:
+        '200':
+          description: Image file
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /img/{filename}/{dimensions}:
+    get:
+      tags:
+        - images
+      summary: Get resized image
+      description: Returns the image resized to specified dimensions
+      operationId: getResizedImage
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Name of the image file
+          schema:
+            type: string
+            example: sample.jpg
+        - name: dimensions
+          in: path
+          required: true
+          description: Image dimensions in format {width}x{height}
+          schema:
+            type: string
+            pattern: '^\d+x\d+$'
+            example: 800x600
+        - name: quality
+          in: query
+          required: false
+          description: Output quality for lossy formats (1-100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 95
+        - name: width
+          in: query
+          required: false
+          description: Override width from path
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 4000
+        - name: height
+          in: query
+          required: false
+          description: Override height from path
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 4000
+      responses:
+        '200':
+          description: Resized image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /img/{filename}/{dimensions}/{format}:
+    get:
+      tags:
+        - images
+      summary: Get resized and converted image
+      description: Returns the image resized and converted to specified format
+      operationId: getResizedConvertedImage
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Name of the image file
+          schema:
+            type: string
+            example: sample.jpg
+        - name: dimensions
+          in: path
+          required: true
+          description: Image dimensions in format {width}x{height}
+          schema:
+            type: string
+            pattern: '^\d+x\d+$'
+            example: 800x600
+        - name: format
+          in: path
+          required: true
+          description: Output format
+          schema:
+            type: string
+            enum:
+              - webp
+              - png
+              - jpeg
+              - jpg
+            example: webp
+        - name: quality
+          in: query
+          required: false
+          description: Output quality for lossy formats (1-100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 95
+        - name: width
+          in: query
+          required: false
+          description: Override width from path
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 4000
+        - name: height
+          in: query
+          required: false
+          description: Override height from path
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 4000
+      responses:
+        '200':
+          description: Processed image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cmd/clear:
+    post:
+      tags:
+        - commands
+      summary: Clear cache
+      description: Clears the entire cache directory and returns statistics
+      operationId: clearCache
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Cache cleared successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearCacheResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cmd/gitupdate:
+    post:
+      tags:
+        - commands
+      summary: Update images from Git
+      description: Updates the images directory via git pull if it's a git repository
+      operationId: gitUpdate
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Git update completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitUpdateResponse'
+        '400':
+          description: Not a git repository
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cmd/{name}:
+    post:
+      tags:
+        - commands
+      summary: Execute command
+      description: Generic command router that dispatches to specific command handlers
+      operationId: executeCommand
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Command name
+          schema:
+            type: string
+            enum:
+              - clear
+              - gitupdate
+      responses:
+        '200':
+          description: Command executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Returns server health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      tags:
+        - health
+      summary: Readiness check
+      description: Returns readiness status
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Server is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+        - code
+        - status
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Image not found
+        code:
+          type: string
+          description: Error code
+          example: FILE_NOT_FOUND
+        status:
+          type: integer
+          description: HTTP status code
+          example: 404
+        request_id:
+          type: string
+          description: Request ID for tracking
+          example: abc123def456
+
+    ClearCacheResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Whether operation succeeded
+          example: true
+        message:
+          type: string
+          description: Success message
+          example: Cache cleared successfully
+        cleared_files:
+          type: integer
+          description: Number of files cleared
+          example: 1234
+        freed_space:
+          type: string
+          description: Amount of space freed
+          example: 2.5GB
+
+    GitUpdateResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Whether update succeeded
+          example: true
+        message:
+          type: string
+          description: Update message
+          example: Git update completed
+        changes:
+          type: integer
+          description: Number of changed files
+          example: 5
+        branch:
+          type: string
+          description: Current branch
+          example: main
+        last_commit:
+          type: string
+          description: Last commit hash
+          example: abc123def456
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Health status
+          example: healthy
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+          example: 1699999999
+        uptime:
+          type: string
+          description: Server uptime
+          example: 2h30m15s
+
+    ReadyResponse:
+      type: object
+      required:
+        - ready
+      properties:
+        ready:
+          type: boolean
+          description: Readiness status
+          example: true
+
+  securitySchemes:
+    AdminAuth:
+      type: http
+      scheme: basic
+      description: |
+        Administrative endpoints should be protected by IP whitelisting or
+        HTTP Basic Auth at the reverse proxy level.
+
+  responses:
+    RateLimitError:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per window
+          schema:
+            type: integer
+            example: 100
+        X-RateLimit-Remaining:
+          description: Remaining requests in window
+          schema:
+            type: integer
+            example: 0
+        X-RateLimit-Reset:
+          description: Time when limit resets (Unix timestamp)
+          schema:
+            type: integer
+            example: 1699999999
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+            example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  headers:
+    X-Request-ID:
+      description: Unique request identifier
+      schema:
+        type: string
+        example: abc123def456
+    X-Cache-Status:
+      description: Cache status (HIT, MISS, BYPASS)
+      schema:
+        type: string
+        enum:
+          - HIT
+          - MISS
+          - BYPASS
+        example: HIT
+
+security: []
+
+externalDocs:
+  description: Full documentation
+  url: https://github.com/devnodesin/goimgserver/tree/main/docs
