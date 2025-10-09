@@ -10,10 +10,12 @@ import (
 	"goimgserver/precache"
 	"goimgserver/processor"
 	"goimgserver/resolver"
+	"goimgserver/server"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -129,16 +131,37 @@ func main() {
 	}
 
 	// Create a Gin router with default middleware (logger and recovery)
-	r := gin.Default()
-
-	// Set trusted proxies to localhost only (removes Gin warning)
-	err = r.SetTrustedProxies([]string{"127.0.0.1"})
-	if err != nil {
-		panic(err)
+	// NOTE: This is replaced by the new server package which includes
+	// enhanced middleware (CORS, security headers, request ID, rate limiting, etc.)
+	
+	// Create server configuration
+	serverConfig := &server.Config{
+		Port:            cfg.Port,
+		ReadTimeout:     30 * time.Second,
+		WriteTimeout:    30 * time.Second,
+		ShutdownTimeout: 10 * time.Second,
+		EnableCORS:      true,
+		EnableRateLimit: false, // Can be enabled in production
+		RateLimit:       100,
+		RatePer:         time.Minute,
+		Production:      false,
 	}
-
+	
+	// Create server
+	srv := server.New(serverConfig)
+	
+	// Add health checks
+	srv.AddHealthCheck("cache", func() bool {
+		_, err := cacheManager.GetStats()
+		return err == nil
+	})
+	srv.AddHealthCheck("filesystem", func() bool {
+		_, err := os.Stat(cfg.ImagesDir)
+		return err == nil
+	})
+	
 	// Define a simple GET endpoint
-	r.GET("/ping", func(c *gin.Context) {
+	srv.Router.GET("/ping", func(c *gin.Context) {
 		// Return JSON response
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -146,24 +169,26 @@ func main() {
 	})
 	
 	// Image endpoints
-	r.GET("/img/*path", imageHandler.ServeImage)
+	srv.Router.GET("/img/*path", imageHandler.ServeImage)
 	log.Println("Image endpoints registered")
 	
 	// Command endpoints
-	r.POST("/cmd/clear", commandHandler.HandleClear)
-	r.POST("/cmd/gitupdate", commandHandler.HandleGitUpdate)
-	r.POST("/cmd/:name", commandHandler.HandleCommand)
+	srv.Router.POST("/cmd/clear", commandHandler.HandleClear)
+	srv.Router.POST("/cmd/gitupdate", commandHandler.HandleGitUpdate)
+	srv.Router.POST("/cmd/:name", commandHandler.HandleCommand)
 	log.Println("Command endpoints registered")
 
 	// Print server startup message
 	fmt.Println("Server started and running.")
 	fmt.Printf("Server will listen on 127.0.0.1:%d (localhost:%d on Windows)\n", cfg.Port, cfg.Port)
 	fmt.Printf("GET http://127.0.0.1:%d/ping to test; you should see message pong.\n", cfg.Port)
+	fmt.Printf("GET http://127.0.0.1:%d/health for health check.\n", cfg.Port)
 	fmt.Printf("Images directory: %s\n", cfg.ImagesDir)
 	fmt.Printf("Cache directory: %s\n", cfg.CacheDir)
 	fmt.Printf("Default image: %s\n", cfg.DefaultImagePath)
 
-	// Start server on configured port
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	r.Run(addr)
+	// Start server with graceful shutdown handling
+	if err := srv.Run(); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
 }
