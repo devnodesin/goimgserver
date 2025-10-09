@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"sync"
 )
@@ -404,4 +405,110 @@ func NewProcessingError(message string, cause error) *AppError {
 func NewCacheError(message string) *AppError {
 	return NewAppError(message, ErrorTypeInternal, nil).
 		WithContext("component", "cache")
+}
+
+// NewTimeoutError creates a timeout error
+func NewTimeoutError(operation, timeout string) *AppError {
+	return NewAppError(
+		fmt.Sprintf("%s timed out after %s", operation, timeout),
+		ErrorTypeTimeout,
+		nil,
+	).WithDetails(map[string]interface{}{
+		"operation": operation,
+		"timeout":   timeout,
+	})
+}
+
+// WrapFileSystemError wraps a file system error
+func WrapFileSystemError(err error) error {
+	if err == nil {
+		return nil
+	}
+	
+	if os.IsNotExist(err) {
+		return NewAppError("File not found", ErrorTypeNotFound, err)
+	}
+	if os.IsPermission(err) {
+		return NewAppError("Permission denied", ErrorTypeInternal, err)
+	}
+	
+	// Default to internal error for other file system errors
+	return NewAppError("File system error", ErrorTypeInternal, err)
+}
+
+// MultiError represents multiple errors
+type MultiError struct {
+	errors []*AppError
+	mu     sync.RWMutex
+}
+
+// NewMultiError creates a new multi-error container
+func NewMultiError() *MultiError {
+	return &MultiError{
+		errors: make([]*AppError, 0),
+	}
+}
+
+// Add adds an error to the collection
+func (m *MultiError) Add(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	if err == nil {
+		return
+	}
+	
+	if appErr, ok := err.(*AppError); ok {
+		m.errors = append(m.errors, appErr)
+	} else {
+		m.errors = append(m.errors, NewAppError(err.Error(), ErrorTypeInternal, err))
+	}
+}
+
+// Count returns the number of errors
+func (m *MultiError) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.errors)
+}
+
+// HasErrors returns true if there are any errors
+func (m *MultiError) HasErrors() bool {
+	return m.Count() > 0
+}
+
+// FirstError returns the first error or nil
+func (m *MultiError) FirstError() *AppError {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	if len(m.errors) == 0 {
+		return nil
+	}
+	return m.errors[0]
+}
+
+// Errors returns all errors
+func (m *MultiError) Errors() []*AppError {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	result := make([]*AppError, len(m.errors))
+	copy(result, m.errors)
+	return result
+}
+
+// Error implements the error interface
+func (m *MultiError) Error() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	if len(m.errors) == 0 {
+		return "no errors"
+	}
+	if len(m.errors) == 1 {
+		return m.errors[0].Error()
+	}
+	return fmt.Sprintf("%d errors occurred: %s (and %d more)", 
+		len(m.errors), m.errors[0].Error(), len(m.errors)-1)
 }
