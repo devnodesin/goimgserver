@@ -1,0 +1,74 @@
+# Sample URLs for Graceful Parsing Tests
+# These URLs demonstrate various edge cases and parameter combinations
+
+# Standard valid URLs
+/img/test.jpg/800x600
+/img/photo.png/1024x768
+/img/banner.webp/1920x1080
+
+# URLs with query parameters
+/img/test.jpg/800x600?quality=85
+/img/test.jpg/800x600?quality=95&format=webp
+/img/test.jpg/800x600?format=png&quality=80
+
+# Complex URLs with multiple parameters
+/img/test.jpg/800x600?quality=85&format=webp&cache=true
+/img/test.jpg/800x600?q=90&fmt=jpg&w=800&h=600
+
+# URLs with special characters in filenames
+/img/test-image.jpg/800x600
+/img/test_image_01.jpg/800x600
+/img/image.2024.01.jpg/800x600
+/img/photo-01_v2.jpg/800x600
+
+# Invalid dimension formats (should use defaults)
+/img/test.jpg/invalid
+/img/test.jpg/800
+/img/test.jpg/x600
+/img/test.jpg/800x
+/img/test.jpg/0x0
+/img/test.jpg/-100x-100
+
+# URLs with duplicate parameters (first should win)
+/img/test.jpg/800x600?quality=85&quality=95
+/img/test.jpg/800x600?format=jpg&format=png
+
+# URLs with invalid parameter values (should use defaults)
+/img/test.jpg/800x600?quality=invalid
+/img/test.jpg/800x600?quality=200
+/img/test.jpg/800x600?format=invalid
+
+# Edge cases
+/img/test.jpg/10x10
+/img/test.jpg/4000x4000
+/img/test.jpg/800x600?
+/img/test.jpg/800x600?&
+/img/test.jpg/800x600?&&quality=85
+
+# Grouped images
+/img/cats/default.jpg/800x600
+/img/cats/cat_white.jpg/800x600
+/img/dogs/puppy.jpg/800x600
+
+# Default image fallback
+/img/{default_image}/800x600
+/img/nonexistent.jpg/800x600
+
+# Large dimensions
+/img/test.jpg/2048x1536
+/img/test.jpg/3840x2160
+
+# Small dimensions
+/img/test.jpg/50x50
+/img/test.jpg/100x100
+
+# Different aspect ratios
+/img/test.jpg/800x600
+/img/test.jpg/600x800
+/img/test.jpg/1920x1080
+/img/test.jpg/1080x1920
+
+# Format conversions
+/img/test.jpg/800x600?format=webp
+/img/test.png/800x600?format=jpeg
+/img/test.webp/800x600?format=png
