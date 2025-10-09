@@ -14,6 +14,8 @@ type Config struct {
 	CacheDir         string
 	Dump             bool
 	DefaultImagePath string
+	PreCacheEnabled  bool
+	PreCacheWorkers  int
 }
 
 // ParseArgs parses command-line arguments and returns a Config
@@ -26,6 +28,8 @@ func ParseArgs(args []string) (*Config, error) {
 	fs.StringVar(&cfg.ImagesDir, "imagesdir", "./images", "Images directory")
 	fs.StringVar(&cfg.CacheDir, "cachedir", "./cache", "Cache directory")
 	fs.BoolVar(&cfg.Dump, "dump", false, "Dump settings to settings.conf")
+	fs.BoolVar(&cfg.PreCacheEnabled, "precache", true, "Enable pre-caching of images on startup")
+	fs.IntVar(&cfg.PreCacheWorkers, "precache-workers", 0, "Number of workers for pre-cache (0 = auto, uses CPU count)")
 
 	err := fs.Parse(args)
 	if err != nil {
@@ -70,5 +74,7 @@ func (c *Config) String() string {
 	if c.DefaultImagePath != "" {
 		sb.WriteString(fmt.Sprintf("DefaultImagePath: %s\n", c.DefaultImagePath))
 	}
+	sb.WriteString(fmt.Sprintf("PreCacheEnabled: %v\n", c.PreCacheEnabled))
+	sb.WriteString(fmt.Sprintf("PreCacheWorkers: %d\n", c.PreCacheWorkers))
 	return sb.String()
 }
