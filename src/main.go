@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"goimgserver/cache"
 	"goimgserver/config"
 	"goimgserver/git"
 	"goimgserver/handlers"
+	"goimgserver/precache"
 	"goimgserver/processor"
 	"goimgserver/resolver"
 	"log"
@@ -15,6 +17,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// imageProcessorAdapter adapts processor.ImageProcessor to precache.ProcessorInterface
+type imageProcessorAdapter struct {
+	processor processor.ImageProcessor
+}
+
+// Process adapts the ImageProcessor.Process to match precache.ProcessorInterface
+func (a *imageProcessorAdapter) Process(data []byte, opts interface{}) ([]byte, error) {
+	// Convert cache.ProcessingParams to processor.ProcessOptions
+	params, ok := opts.(cache.ProcessingParams)
+	if !ok {
+		return nil, fmt.Errorf("invalid options type")
+	}
+	
+	processOpts := processor.ProcessOptions{
+		Width:   params.Width,
+		Height:  params.Height,
+		Format:  processor.ImageFormat(params.Format),
+		Quality: params.Quality,
+	}
+	
+	return a.processor.Process(data, processOpts)
+}
 
 func main() {
 	// Parse command-line arguments
@@ -76,6 +101,32 @@ func main() {
 	// Create command handler
 	commandHandler := handlers.NewCommandHandler(cfg, cacheManager, gitOps)
 	log.Println("Command handler initialized")
+	
+	// Run pre-cache if enabled
+	if cfg.PreCacheEnabled {
+		log.Println("Starting pre-cache initialization...")
+		preCacheConfig := &precache.PreCacheConfig{
+			ImageDir:         cfg.ImagesDir,
+			CacheDir:         cfg.CacheDir,
+			DefaultImagePath: cfg.DefaultImagePath,
+			Enabled:          cfg.PreCacheEnabled,
+			Workers:          cfg.PreCacheWorkers,
+		}
+		
+		// Create processor adapter for pre-cache (adapts processor.ImageProcessor to precache.ProcessorInterface)
+		processorAdapter := &imageProcessorAdapter{processor: imageProcessor}
+		
+		// Create pre-cache instance
+		preCache, err := precache.New(preCacheConfig, fileResolver, cacheManager, processorAdapter)
+		if err != nil {
+			log.Printf("Warning: Failed to create pre-cache: %v", err)
+		} else {
+			// Run pre-cache asynchronously to not block server startup
+			preCache.RunAsync(context.Background())
+		}
+	} else {
+		log.Println("Pre-cache disabled")
+	}
 
 	// Create a Gin router with default middleware (logger and recovery)
 	r := gin.Default()

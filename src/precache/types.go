@@ -2,7 +2,13 @@ package precache
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+// Common errors
+var (
+	ErrInvalidOptions = errors.New("invalid options type")
 )
 
 // Scanner scans directories for images to pre-cache
