@@ -413,3 +413,178 @@ func TestAuthentication_CombinedAuth(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthentication_TokenAuth_EdgeCases tests edge cases in token auth
+func TestAuthentication_TokenAuth_EdgeCases(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	
+	// Test with regular token auth
+	regularAuth := NewTokenAuthenticator([]string{"valid"})
+	router1 := gin.New()
+	router1.Use(TokenAuthMiddleware(regularAuth))
+	router1.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	
+	// Test bearer token extraction edge cases
+	tests := []struct {
+		name   string
+		header string
+		expectOK bool
+	}{
+		{"multiple_spaces", "Bearer  token", true},
+		{"trailing_space", "Bearer token ", true},
+		{"extra_bearer", "Bearer Bearer token", true},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, ok := ExtractBearerToken(tt.header)
+			assert.True(t, ok)
+			assert.NotEmpty(t, token)
+		})
+	}
+}
+
+// TestAuthorization_EdgeCases tests authorization edge cases
+func TestAuthorization_EdgeCases(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authz := NewAuthorizer()
+	authz.AddRole("admin", []string{"read", "write"})
+	
+	// Test permission check for non-existent role
+	assert.False(t, authz.HasPermission("nonexistent", "read"))
+	
+	// Test permission check for valid role without permission
+	assert.False(t, authz.HasPermission("admin", "delete"))
+	
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		// Don't set role - test missing role
+		c.Next()
+	})
+	router.Use(RequirePermission(authz, "read"))
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	
+	// Test with wrong role type
+	router2 := gin.New()
+	router2.Use(func(c *gin.Context) {
+		c.Set("role", 123) // Wrong type
+		c.Next()
+	})
+	router2.Use(RequirePermission(authz, "read"))
+	router2.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	
+	req2 := httptest.NewRequest("GET", "/test", nil)
+	w2 := httptest.NewRecorder()
+	router2.ServeHTTP(w2, req2)
+	
+	assert.Equal(t, http.StatusForbidden, w2.Code)
+}
+
+// TestValidation_EdgeCases tests validation edge cases
+func TestValidation_EdgeCases(t *testing.T) {
+	// Test file extension validation edge cases
+	tests := []struct {
+		name     string
+		filename string
+		wantErr  bool
+	}{
+		{"dotfile_with_ext", ".hidden.jpg", false},
+		{"multiple_dots_hidden", "...test.png", false},
+		{"just_extension", ".jpg", false},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFileExtension(tt.filename)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+	
+	// Test dimension validation with aspect ratio
+	w, h, err := ValidateDimensions(800, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 800, w)
+	assert.Equal(t, 0, h)
+}
+
+// TestResourceProtection_EdgeCases tests resource protection edge cases
+func TestResourceProtection_EdgeCases(t *testing.T) {
+	// Test disk space monitor with invalid path
+	monitor := NewDiskSpaceMonitor("/nonexistent/path", 1000)
+	_, err := monitor.GetUsage()
+	assert.Error(t, err)
+	
+	// IsThresholdExceeded should handle errors gracefully
+	exceeded := monitor.IsThresholdExceeded()
+	assert.False(t, exceeded)
+	
+	// Test with very high threshold (should not be exceeded)
+	monitor2 := NewDiskSpaceMonitor("/tmp", 1000*1024*1024*1024*1024) // 1 PB
+	usage, err := monitor2.GetUsage()
+	assert.NoError(t, err)
+	assert.NotNil(t, usage)
+	exceeded2 := monitor2.IsThresholdExceeded()
+	assert.False(t, exceeded2)
+}
+
+// TestParseAndValidateParameters_FullCoverage tests all parameter parsing paths
+func TestParseAndValidateParameters_FullCoverage(t *testing.T) {
+	tests := []struct {
+		name     string
+		segments []string
+		checkFn  func(t *testing.T, params ProcessingParams)
+	}{
+		{
+			name:     "quality_first_wins",
+			segments: []string{"q80", "q90"},
+			checkFn: func(t *testing.T, params ProcessingParams) {
+				assert.Equal(t, 80, params.Quality)
+			},
+		},
+		{
+			name:     "format_first_wins",
+			segments: []string{"png", "jpeg"},
+			checkFn: func(t *testing.T, params ProcessingParams) {
+				assert.Equal(t, "png", params.Format)
+			},
+		},
+		{
+			name:     "width_only",
+			segments: []string{"600"},
+			checkFn: func(t *testing.T, params ProcessingParams) {
+				assert.Equal(t, 600, params.Width)
+				assert.Equal(t, 0, params.Height)
+			},
+		},
+		{
+			name:     "invalid_quality_uses_default",
+			segments: []string{"q999"},
+			checkFn: func(t *testing.T, params ProcessingParams) {
+				assert.Equal(t, DefaultQuality, params.Quality)
+			},
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := ParseAndValidateParameters(tt.segments)
+			tt.checkFn(t, params)
+		})
+	}
+}
