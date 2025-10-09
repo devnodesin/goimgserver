@@ -2,11 +2,13 @@ package precache
 
 import (
 	"context"
+	"fmt"
 	"goimgserver/cache"
 	"goimgserver/resolver"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,6 +188,114 @@ func Test_ProcessImage_CorruptedImage(t *testing.T) {
 	
 	// Should handle error gracefully
 	assert.Error(t, err, "Should return error for corrupted image")
+}
+
+func Test_ProcessImage_Performance_LargeDirectory(t *testing.T) {
+	// Skip in short mode
+	if testing.Short() {
+		t.Skip("Skipping performance test in short mode")
+	}
+	
+	// Create test directories
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	imageDir := filepath.Join(tmpDir, "images")
+	err := os.MkdirAll(imageDir, 0755)
+	require.NoError(t, err)
+	
+	// Create many test images (100 images to simulate large directory)
+	numImages := 100
+	for i := 0; i < numImages; i++ {
+		testImage := filepath.Join(imageDir, fmt.Sprintf("image%d.jpg", i))
+		err = os.WriteFile(testImage, getTestJPEGData(), 0644)
+		require.NoError(t, err)
+	}
+	
+	// Create dependencies
+	fileResolver := resolver.NewResolverWithCache(imageDir)
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	mockProcessor := &mockImageProcessor{}
+	
+	// Create processor
+	proc := &preCacheProcessor{
+		imageDir:  imageDir,
+		resolver:  fileResolver,
+		cache:     cacheManager,
+		processor: mockProcessor,
+	}
+	
+	// Measure processing time
+	start := time.Now()
+	successCount := 0
+	for i := 0; i < numImages; i++ {
+		testImage := filepath.Join(imageDir, fmt.Sprintf("image%d.jpg", i))
+		err = proc.Process(context.Background(), testImage)
+		if err == nil {
+			successCount++
+		}
+	}
+	duration := time.Since(start)
+	
+	// Verify all images were processed
+	assert.Equal(t, numImages, successCount, "All images should be processed successfully")
+	
+	// Log performance metrics
+	avgTime := duration / time.Duration(numImages)
+	t.Logf("Processed %d images in %v (avg: %v per image)", numImages, duration, avgTime)
+}
+
+func Test_ProcessImage_WithDefaultImageFallback(t *testing.T) {
+	// Create test directories
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	imageDir := filepath.Join(tmpDir, "images")
+	err := os.MkdirAll(imageDir, 0755)
+	require.NoError(t, err)
+	
+	// Create a regular image file
+	testImage := filepath.Join(imageDir, "regular.jpg")
+	err = os.WriteFile(testImage, getTestJPEGData(), 0644)
+	require.NoError(t, err)
+	
+	// Create a default image (simulating default image system)
+	defaultImage := filepath.Join(imageDir, "default.jpg")
+	err = os.WriteFile(defaultImage, getTestJPEGData(), 0644)
+	require.NoError(t, err)
+	
+	// Create dependencies
+	fileResolver := resolver.NewResolverWithCache(imageDir)
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	mockProcessor := &mockImageProcessor{}
+	
+	// Create processor
+	proc := &preCacheProcessor{
+		imageDir:  imageDir,
+		resolver:  fileResolver,
+		cache:     cacheManager,
+		processor: mockProcessor,
+	}
+	
+	// Process the regular image (should work even when default image exists)
+	err = proc.Process(context.Background(), testImage)
+	require.NoError(t, err)
+	
+	// Verify cache was created for the regular image
+	params := cache.ProcessingParams{
+		Width:   1000,
+		Height:  1000,
+		Format:  "webp",
+		Quality: 95,
+	}
+	
+	relPath, err := filepath.Rel(imageDir, testImage)
+	require.NoError(t, err)
+	result, err := fileResolver.Resolve(relPath)
+	require.NoError(t, err)
+	
+	exists := cacheManager.Exists(result.ResolvedPath, params)
+	assert.True(t, exists, "Regular image should be cached when default image system is available")
 }
 
 // getTestJPEGData returns a minimal valid JPEG image (1x1 red pixel)

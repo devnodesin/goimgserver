@@ -209,3 +209,56 @@ func Test_Concurrent_WorkerPool(t *testing.T) {
 		})
 	}
 }
+
+func Test_Concurrent_WorkerPoolZeroWorkers(t *testing.T) {
+	// Test that zero workers defaults to 4
+	tmpDir := t.TempDir()
+	imageDir := filepath.Join(tmpDir, "images")
+	err := os.MkdirAll(imageDir, 0755)
+	require.NoError(t, err)
+	
+	// Create test image
+	imagePath := filepath.Join(imageDir, "image.jpg")
+	err = os.WriteFile(imagePath, getTestJPEGData(), 0644)
+	require.NoError(t, err)
+	
+	// Create dependencies
+	fileResolver := resolver.NewResolverWithCache(imageDir)
+	cacheDir := filepath.Join(tmpDir, "cache")
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	mockProcessor := &mockImageProcessor{}
+	
+	processor := NewProcessor(imageDir, fileResolver, cacheManager, mockProcessor)
+	
+	// Test with 0 workers (should default to 4)
+	executor := NewConcurrentExecutor(processor, 0, NewProgress())
+	stats, err := executor.Execute(context.Background(), []string{imagePath})
+	
+	require.NoError(t, err)
+	assert.Equal(t, 1, stats.ProcessedOK)
+}
+
+func Test_Concurrent_EmptyImageList(t *testing.T) {
+	// Test handling of empty image list
+	tmpDir := t.TempDir()
+	imageDir := filepath.Join(tmpDir, "images")
+	err := os.MkdirAll(imageDir, 0755)
+	require.NoError(t, err)
+	
+	fileResolver := resolver.NewResolverWithCache(imageDir)
+	cacheDir := filepath.Join(tmpDir, "cache")
+	cacheManager, err := cache.NewManager(cacheDir)
+	require.NoError(t, err)
+	mockProcessor := &mockImageProcessor{}
+	
+	processor := NewProcessor(imageDir, fileResolver, cacheManager, mockProcessor)
+	executor := NewConcurrentExecutor(processor, 2, NewProgress())
+	
+	// Execute with empty list
+	stats, err := executor.Execute(context.Background(), []string{})
+	
+	require.NoError(t, err)
+	assert.Equal(t, 0, stats.TotalImages)
+	assert.Equal(t, 0, stats.ProcessedOK)
+}
