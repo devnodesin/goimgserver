@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"goimgserver/cache"
 	"goimgserver/config"
+	"goimgserver/git"
 	"goimgserver/handlers"
 	"goimgserver/processor"
 	"goimgserver/resolver"
@@ -67,6 +68,14 @@ func main() {
 	// Create image handler
 	imageHandler := handlers.NewImageHandler(cfg, fileResolver, cacheManager, imageProcessor)
 	log.Println("Image handler initialized")
+	
+	// Create git operations
+	gitOps := git.NewOperations()
+	log.Println("Git operations initialized")
+	
+	// Create command handler
+	commandHandler := handlers.NewCommandHandler(cfg, cacheManager, gitOps)
+	log.Println("Command handler initialized")
 
 	// Create a Gin router with default middleware (logger and recovery)
 	r := gin.Default()
@@ -88,6 +97,12 @@ func main() {
 	// Image endpoints
 	r.GET("/img/*path", imageHandler.ServeImage)
 	log.Println("Image endpoints registered")
+	
+	// Command endpoints
+	r.POST("/cmd/clear", commandHandler.HandleClear)
+	r.POST("/cmd/gitupdate", commandHandler.HandleGitUpdate)
+	r.POST("/cmd/:name", commandHandler.HandleCommand)
+	log.Println("Command endpoints registered")
 
 	// Print server startup message
 	fmt.Println("Server started and running.")
