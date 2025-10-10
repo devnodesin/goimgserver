@@ -145,7 +145,26 @@ For more details, see [Pre-cache Package Documentation](src/precache/README.md).
 
 ## Testing
 
-Run the test suite:
+Run the comprehensive test suite:
+
+```bash
+# Run all tests with summary
+./run_test.sh
+
+# Run tests with coverage report
+./run_test.sh --coverage
+
+# Run only short tests (faster)
+./run_test.sh --short
+
+# Run with verbose output
+./run_test.sh --verbose
+
+# Run benchmarks
+./run_test.sh --bench
+```
+
+Alternatively, run tests directly:
 
 ```bash
 cd src
@@ -157,6 +176,8 @@ Test command endpoints (requires server to be running):
 ```bash
 ./test_commands.sh
 ```
+
+For detailed testing information, see the [Testing Guide](docs/testing.md).
 
 ## Documentation
 
