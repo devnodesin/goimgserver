@@ -47,6 +47,7 @@ The devcontainer provides:
 The devcontainer automatically performs these steps:
 
 1. **Container Creation** (`onCreateCommand`):
+   - Creates cache and images directories if they don't exist
    - Updates apt package lists
    - Installs libvips-dev and pkg-config (required for image processing)
    - Installs Go development tools (gopls, delve, staticcheck, goimports)
