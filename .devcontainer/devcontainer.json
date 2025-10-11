@@ -1,0 +1,86 @@
+{
+	"name": "goimgserver Development Environment",
+	"image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+	
+	// Features to add to the dev container
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "latest"
+		}
+	},
+
+	// Configure tool-specific properties
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"go.toolsManagement.checkForUpdates": "local",
+				"go.useLanguageServer": true,
+				"go.gopath": "/go",
+				"go.goroot": "/usr/local/go",
+				"go.lintTool": "golangci-lint",
+				"go.lintOnSave": "package",
+				"go.formatTool": "goimports",
+				"go.testFlags": ["-v"],
+				"editor.formatOnSave": true,
+				"editor.codeActionsOnSave": {
+					"source.organizeImports": "explicit"
+				}
+			},
+			"extensions": [
+				"golang.go",
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				"ms-azuretools.vscode-docker",
+				"eamodio.gitlens",
+				"streetsidesoftware.code-spell-checker"
+			]
+		}
+	},
+
+	// Use 'onCreateCommand' to run commands when creating the container
+	"onCreateCommand": {
+		"install-libvips": "sudo apt-get update && sudo apt-get install -y libvips-dev pkg-config",
+		"install-go-tools": "go install golang.org/x/tools/gopls@latest && go install github.com/go-delve/delve/cmd/dlv@latest && go install honnef.co/go/tools/cmd/staticcheck@latest && go install golang.org/x/tools/cmd/goimports@latest"
+	},
+
+	// Use 'postCreateCommand' to run commands after the container is created
+	"postCreateCommand": "cd src && go mod download && go build",
+
+	// Use 'postStartCommand' to run commands after the container starts
+	"postStartCommand": "echo 'Development environment ready!'",
+
+	// Set environment variables
+	"containerEnv": {
+		"GOMAXPROCS": "4",
+		"GOGC": "100",
+		"CGO_ENABLED": "1"
+	},
+
+	// Configure port forwarding
+	"forwardPorts": [9000],
+	"portsAttributes": {
+		"9000": {
+			"label": "goimgserver",
+			"onAutoForward": "notify"
+		}
+	},
+
+	// Set the default user to 'vscode' (non-root)
+	"remoteUser": "vscode",
+
+	// Mount the workspace folder
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+	// Configure container runtime options
+	"runArgs": [
+		"--cap-add=SYS_PTRACE",
+		"--security-opt",
+		"seccomp=unconfined"
+	],
+
+	// Set up mounts for persistent data
+	"mounts": [
+		"source=${localWorkspaceFolder}/src/cache,target=${containerWorkspaceFolder}/src/cache,type=bind,consistency=cached",
+		"source=${localWorkspaceFolder}/src/images,target=${containerWorkspaceFolder}/src/images,type=bind,consistency=cached"
+	]
+}
