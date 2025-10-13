@@ -17,12 +17,12 @@ goimgserver - These services allow you to store images, then serve optimized, re
 ```bash
 sudo apt-get update && sudo apt-get install -y libvips-dev
 cd src
-go build
+make build
 ```
 
 ```bash
 cd src
-go run main.go
+make run
 ```
 
 All parameters are optional: if not specified, they will start with default values:
@@ -60,107 +60,28 @@ curl -X POST "http://localhost:9000/cmd/gitupdate"
 
 - Use tools like `curl` or a browser to test the endpoints.
 
-## Command Endpoints
-
-The server provides administrative command endpoints for maintenance operations:
-
-### POST /cmd/clear
-Clears the entire cache directory and returns statistics about freed space.
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "message": "Cache cleared successfully",
-  "cleared_files": 1234,
-  "freed_space": "2.5GB"
-}
-```
-
-### POST /cmd/gitupdate
-Updates the images directory via `git pull` if it's a git repository.
-
-**Example Response (Success):**
-```json
-{
-  "success": true,
-  "message": "Git update completed",
-  "changes": 5,
-  "branch": "main",
-  "last_commit": "abc123..."
-}
-```
-
-**Example Response (Not a Git Repo):**
-```json
-{
-  "success": false,
-  "error": "Images directory is not a git repository",
-  "code": "GIT_NOT_FOUND"
-}
-```
-
-### POST /cmd/:name
-Generic command router that dispatches to specific command handlers.
-
-**Valid Commands:** `clear`, `gitupdate`
-
-## Pre-cache System
-
-The server includes an automatic pre-caching system that runs during startup to improve initial response times.
-
-### How It Works
-
-When the server starts, it:
-1. Scans the images directory for all supported image files (JPEG, PNG, WebP)
-2. Creates default cached versions of each image:
-   - **Dimensions**: 1000x1000 pixels
-   - **Format**: WebP
-   - **Quality**: 95
-3. Stores pre-cached images in the cache directory
-4. Skips already cached images to avoid redundant work
-
-### Configuration
-
-```bash
-# Enable pre-cache (default)
-go run main.go --precache=true
-
-# Disable pre-cache
-go run main.go --precache=false
-
-# Set number of workers (0 = auto, uses CPU count)
-go run main.go --precache-workers=8
-```
-
-### Features
-
-- **Async Execution**: Runs asynchronously to not block server startup
-- **Concurrent Processing**: Uses worker pools for fast processing
-- **Progress Logging**: Real-time progress updates in logs
-- **Error Handling**: Gracefully handles corrupted or missing images
-- **Smart Exclusion**: Skips system default images and already cached files
-
-For more details, see [Pre-cache Package Documentation](src/precache/README.md).
-
 ## Testing
 
 Run the comprehensive test suite:
 
 ```bash
 # Run all tests with summary
-./run_test.sh
+make test
 
 # Run tests with coverage report
+cd src
 ./run_test.sh --coverage
 
 # Run only short tests (faster)
+cd src
 ./run_test.sh --short
 
 # Run with verbose output
+cd src
 ./run_test.sh --verbose
 
 # Run benchmarks
+cd src
 ./run_test.sh --bench
 ```
 
@@ -168,13 +89,15 @@ Alternatively, run tests directly:
 
 ```bash
 cd src
-go test ./...
+make test
 ```
 
 Test command endpoints (requires server to be running):
 
 ```bash
+cd test
 ./test_commands.sh
+./test_server_middleware.sh
 ```
 
 For detailed testing information, see the [Testing Guide](docs/testing.md).
@@ -278,7 +201,7 @@ docker-compose logs -f
 ```bash
 # Build application
 cd src
-go build -o goimgserver main.go
+make build
 
 # Install as service
 cd ../docs/deployment/systemd
