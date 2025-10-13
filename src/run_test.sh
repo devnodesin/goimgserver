@@ -72,14 +72,11 @@ echo -e "${BLUE}=== goimgserver Test Suite ===${NC}"
 echo "Starting comprehensive test execution..."
 echo ""
 
-# Check if we're in the right directory
-if [ ! -f "src/go.mod" ]; then
-  echo -e "${RED}Error: src/go.mod not found. Please run from the project root directory.${NC}"
+# Ensure the script is in the src directory
+if [ ! -f "go.mod" ]; then
+  echo -e "${RED}Error: Please run this script from the src directory.${NC}"
   exit 1
 fi
-
-# Change to src directory where go.mod is located
-cd src
 
 # Build test flags
 TEST_FLAGS=""
